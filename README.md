@@ -17,12 +17,16 @@ Socks4 is simple python script to monitor network and modify before send.
 
 ### Command
 
-Some command currently woking on python console
 
 >print [package] 
+
 * show infomation about this package
+
 >repeat [package] 
+
 * resend this package
+
 >diff [first package] [secondpackage] 
+
 * diffirent between 2 package
 
