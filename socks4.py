@@ -121,6 +121,43 @@ class Datahandle():
 
 
 
+def rpl(string,position,value):
+    return string[0:position] + value + string[position + 1:]
+
+
+
+
+def strdiff(x,y):
+
+    hx = hexdump(x)
+    hy = hexdump(y)
+
+    diff = [i for i in xrange(len(hx)) if hx[i] != hy[i]]
+
+    rx = ''
+    ry = ''
+    for i in diff:
+        if i % 77 < 58:
+            if hx[i+1] == ' ' and (i-1) not in diff:
+                diff.append(i-1)
+            elif hx[i-1] == ' ' and (i+1) not in diff:
+                diff.append(i+1)
+            else:
+                pass
+
+    for i in range(len(hx)):
+        if i in diff:
+            rx += colored(hx[i],'red')
+            ry += colored(hy[i],'red')
+        else:
+            rx += hx[i]
+            ry += hy[i]
+
+    print rx
+    print ry    
+
+
+
 
 class MSock4(SOCKSv4):
 
@@ -135,7 +172,10 @@ class MSock4(SOCKSv4):
             if command == 'repeat':
 
                 repeat_package = datahandle.allpk[args].package
-                print '[REPEAT]',getCSInfo(repeat_package),datahandle.allpk[args].data
+                data = datahandle.allpk[args].data
+                print '[REPEAT]',getCSInfo(repeat_package)
+                print colored(hexdump(data), 'red')
+
                 SOCKSv4.dataReceived(repeat_package,datahandle.allpk[args].data)
 
             elif command == 'print':
@@ -154,14 +194,25 @@ class MSock4(SOCKSv4):
             arg1 = cmd.split(' ')[1]
             arg2 = cmd.split(' ')[2]
 
-            if command == 'compare':
+            if command == 'diff':
                 pckg1_data = datahandle.allpk[arg1].data
                 pckg2_data = datahandle.allpk[arg2].data
-                #for i in pckg1_data:
+                strdiff(pckg1_data,pckg2_data)
 
 
 
+        if  len(cmd.split(' ')) == 4:
+            command = cmd.split(' ')[0]
+            args = cmd.split(' ')[1]
+            position = cmd.split(' ')[2]
+            value = cmd.split(' ')[3]
+            if command == 'rplace':
+                replace_package = datahandle.allpk[args].package
+                data = datahandle.allpk[args].data
+                data = rpl(data,int(position),chr(int('0x' + value,16)))
 
+                print colored(hexdump(data), 'red')
+                SOCKSv4.dataReceived(replace_package,data)
 
 
             print "[E] Not implement"
@@ -188,6 +239,9 @@ class MSock4(SOCKSv4):
             return SOCKSv4.dataReceived(self,data)
         
 
+        print '[PACKAGE]', len(datahandle.allpk)
+        logdata('[PACKAGE]' + str(len(datahandle.allpk)))
+
         datahandle.addpk(self,data)
         #return SOCKSv4.dataReceived(self,data)
         
@@ -199,7 +253,6 @@ class MSock4(SOCKSv4):
         logdata('%s\n%s' % (csinfo, hexdump(data)))
         
 
-        print '[TOTAL PACKAGE]', len(datahandle.allpk)
         return SOCKSv4.dataReceived(self, data)
 
 
@@ -216,6 +269,8 @@ class MSock4(SOCKSv4):
         
         cs = getCSInfo(self)
 
+        print '[PACKAGE]', len(datahandle.allpk)
+        logdata('[PACKAGE]' + str(len(datahandle.allpk)))
         datahandle.addpk(self,data)
         return SOCKSv4.write(self, data)
 
@@ -227,7 +282,6 @@ class MSock4(SOCKSv4):
 
         logdata('%s\n%s' % (csinfo, hexdump(data)))
 
-        print '[TOTAL PACKAGE]', len(datahandle.allpk)
 
         return SOCKSv4.write(self, data)
 
