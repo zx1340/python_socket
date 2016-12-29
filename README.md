@@ -4,7 +4,7 @@ Socks4 is simple python script to monitor network and modify before send.
 *It woking on window and linux now
 * Open first cmd
 ```sh
->python socks4.py
+>python socksproxy.py
 ```
 Example output:
 ```
@@ -80,9 +80,9 @@ Example:
 >filter removeport [port]
  * Port filter
 
->filter ban [ip]
+>filter ip [ip]
  
- * Ban ip
+ * Just follow given ip
 
 >filter len [package_size]
 
@@ -93,4 +93,10 @@ Example:
 
  * Only send or recv show up.
 
+>filter replace [hexstring] [hexstring]
 
+ * Modify package before send
+
+###conclusion
+This program gen file pkg.log store all package data
+Using strings pkg.log to get all strings
