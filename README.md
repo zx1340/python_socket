@@ -1,4 +1,4 @@
-# SOCKS4
+# sockproxy
 Socks4 is simple python script to monitor network and modify before send.
 ### USING
 *It woking on window and linux now
