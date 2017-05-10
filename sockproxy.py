@@ -189,24 +189,24 @@ def changeFilter(command):
     if command[1] == 'addport':
         
         if len(command) != 3:
-            return '[E]Using:filter addport <port>'
+            return '[E]Using:filter addport <Port>'
 
-        if command[2] in Filter['port']:
-            return '[I]This port already filted'
+        if command[2] in Filter['Port']:
+            return '[I]This Port already filted'
         
 
-        Filter['port'].append(command[2])
+        Filter['Port'].append(command[2])
         return '[I]Port %s added successfull' % (command[2])
 
-    if command[1] == 'removeport':
+    if command[1] == 'removePort':
         if len(command) != 3:
-            return '[E]Using:filter removeport <port>'
+            return '[E]Using:filter removePort <Port>'
 
-        if command[2] not in Filter['port']:
-            return '[E]Need add port before remove it'
+        if command[2] not in Filter['Port']:
+            return '[E]Need add Port before remove it'
         
-        Filter['port'].remove(command[2])
-        return '[I]Remove port successfull'
+        Filter['Port'].remove(command[2])
+        return '[I]Remove Port successfull'
 
     if command[1] == 'ip':
         if len(command) != 3:
@@ -475,7 +475,7 @@ class MSock4(SOCKSv4):
             return SOCKSv4.write(self,ret)
 
 
-        data = self.handlePackage('Send',data)
+        data = self.handlePackage('Recv',data)
         
         return SOCKSv4.dataReceived(self, data)
 
@@ -489,7 +489,7 @@ class MSock4(SOCKSv4):
             data = editdata(data)
         
         
-        data = self.handlePackage('Recv',data)
+        data = self.handlePackage('Send',data)
         
 
         return SOCKSv4.write(self, data)

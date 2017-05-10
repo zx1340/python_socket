@@ -1,6 +1,8 @@
 import socks
 import socket
+import colorama
 
+from termcolor import colored
 MAX_PACKAGE_SIZE = 99999
 
 def cn():
