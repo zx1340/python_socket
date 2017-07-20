@@ -15,7 +15,9 @@ import colorama
 import socket
 import os
 
-port, logfile, dumplen, printmode, hijack, olddata, newdata, ignore = 8080, '', 16, 'hex', '', '', '', ''
+port, full_capture = 8080, False
+printmode = 'hex'
+dumplen = 16
 colorama.init()
 
 
@@ -43,8 +45,9 @@ class Datahandle():
 
 
 def hexdump(src, sep='.'):
-    if printmode == 'text':
+    if printmode == 'text' or full_capture == False:
         return src
+
     length = dumplen
     FILTER = ''.join(
         [(len(repr(chr(x))) == 3) and chr(x) or sep for x in range(256)])
@@ -60,13 +63,6 @@ def hexdump(src, sep='.'):
     return ''.join(lines)
 
 
-
-
-def logdata(data):
-    #if logfile != '':
-    file = open('zx.log', 'ab+')
-    file.write(data + '\n')
-    file.close()
 
 
 def logpackage(data):
@@ -106,38 +102,28 @@ def main(argv):
     os.system('rm -rf pkg.log')
     os.system('rm -rf zx.log')
 
-    global port, logfile, dumplen, printmode, hijack, olddata, newdata, ignore
+    global port, full_capture
 
     try:
-        myopts, args = getopt.getopt(sys.argv[1:], 'p:l:x:t')
+        myopts, args = getopt.getopt(sys.argv[1:], 'p:f')
     except getopt.GetoptError as e:
         print (str(e))
         print 'Usage: %s [options]\nOptions:' \
               '\n-p port (listen port)' \
-              '\n-l logfile (traffic log)' \
-              '\n-x hexlength (hex length to print, default is 16)' \
-              '\n-t text/hex (display mode: text or hex'\
+              '\n-f full capture' \
               '\n' % (sys.argv[0])
         sys.exit(2)
 
     for o, a in myopts:
         if o == '-p':
             port = int(a)
-        elif o == '-l':
-            logfile = a
-        elif o == '-x':
-            dumplen = int(a)
-        elif o == '-t':
-            printmode = a
-        elif o == '-h':
-            hijack, olddata, newdata = a.split(':')
-        elif o == '-i':
-            ignore = a.split(':')
+        elif o == '-f':
+            full_capture = True
         
     factory = Factory
     factory.protocol = MSock4
     reactor.listenTCP(port, factory())
-    print 'Listen port: %s\nLog file: %s\nHex length %s\nPrint mode: %s' % (port, logfile, dumplen, printmode)
+    print 'Listen port: %s\nFull capture: %s' % (port, str(full_capture))
     reactor.run()
 
 
@@ -307,7 +293,12 @@ class MSock4(SOCKSv4):
 
     def handlePackage(self,Mode,data):
         #check filter and print out
-        
+        #ignore web traffic
+        if not full_capture:
+            if data[0:4] != 'POST' and data[0:3] != 'GET':
+                return data
+
+
         global datahandle
 
         datahandle.addpk(self,Mode,data)
@@ -335,13 +326,11 @@ class MSock4(SOCKSv4):
                 if rpl_type == 's' or rpl_type == 'b':
                     if Mode == "Send":
                         if old_str in data:
-                            logdata("__FOUND__|" + old_str )    
                             data = data.replace(old_str,new_str)
                 
                 if rpl_type == 'r' or rpl_type == 'b':
                     if Mode == 'Recv':
                         if old_str in data:
-                            logdata("__FOUND__|" + old_str )    
                             data = data.replace(old_str,new_str)
 
         prtcsinfo = '%s:%s --> %s:%s' % csinfo if Mode == 'Send' else '%s:%s <-- %s:%s' % csinfo 
@@ -351,8 +340,7 @@ class MSock4(SOCKSv4):
 
         print colored(prtcsinfo, 'red')
         print colored(hexdump(data), 'yellow') if Mode == 'Send' else colored(hexdump(data), 'green')
-        logdata(prtcsinfo)
-        logdata(hexdump(data))
+        logpackage(prtcsinfo)
         logpackage(data)
         return data
 
@@ -519,9 +507,6 @@ class MSock4(SOCKSv4):
         if not self.otherConn:
             return SOCKSv4.write(self, data)
 
-        if hijack == 'r':
-            data = editdata(data)
-        
         
         data = self.handlePackage('Send',data)
         
