@@ -13,7 +13,7 @@ import sys
 import getopt
 import colorama
 import socket
-
+import os
 
 port, logfile, dumplen, printmode, hijack, olddata, newdata, ignore = 8080, '', 16, 'hex', '', '', '', ''
 colorama.init()
@@ -102,6 +102,10 @@ def editdata(data):
 
 
 def main(argv):
+
+    os.system('rm -rf pkg.log')
+    os.system('rm -rf zx.log')
+
     global port, logfile, dumplen, printmode, hijack, olddata, newdata, ignore
 
     try:
@@ -129,7 +133,7 @@ def main(argv):
             hijack, olddata, newdata = a.split(':')
         elif o == '-i':
             ignore = a.split(':')
-
+        
     factory = Factory
     factory.protocol = MSock4
     reactor.listenTCP(port, factory())
@@ -240,18 +244,32 @@ def changeFilter(command):
 
 
     if command[1] == 'replace':
-        if len(command) != 4:
-            return '[E]Using:filter replace <encode_hex_string> <encode_hex_string>'
+        if len(command) < 5:
+            return '[E]Using:filter replace <s/r/b> [hex] <old_string> <new_string>'
 
-        if len(command[2]) != len(command[3]):
+        rpl_type = command[2]
+        
+        if rpl_type not in ['s','r','b']:
+            return '[E]Using replace [s]end [r]eceive or [b]oth'
+        
+        if len(command) == 6:
+            if command[3] == 'hex':
+                try:
+                    old_string = command[4].decode('hex')
+                    new_string = command[5].decode('hex')
+                except:
+                    return '[E]Need encoded hex string'
+        
+        else:
+
+            old_string = command[3]
+            new_string = command[4]
+        
+        if len(old_string) != len(new_string):
             return '[E]Need same size encode string'
 
-
-        str1 = command[2].decode('hex')
-        str2 = command[3].decode('hex')
-
-        Filter['replace'][str1] = str2
-
+        Filter['replace'].append( (rpl_type,old_string,new_string) )
+        
         return '[I]Filter:' + str(Filter['replace'])
 
 
@@ -264,14 +282,13 @@ def changeFilter(command):
         return '[I]Mode recv turned on'
 
 
-
-    if command[1] == 'nofilter':
+    if command[1] == 'reset':
         Filter = {
         'Mode':None,
         'Port':[],
         'Size':[],
         'ip':[],
-        'replace':{}
+        'replace':[]
         }
 
         return '[I]No Filter now'
@@ -311,12 +328,23 @@ class MSock4(SOCKSv4):
         
 
         if len(Filter['replace']):
-            for i in Filter['replace'].keys():
-                if i in data:
-                    logdata("__FOUND__|" + i )    
-                    data = data.replace(i,Filter['replace'][i])
+            for rpl in Filter['replace']:
+                rpl_type = rpl[0]
+                old_str = rpl[1]
+                new_str = rpl[2]
+                if rpl_type == 's' or rpl_type == 'b':
+                    if Mode == "Send":
+                        if old_str in data:
+                            logdata("__FOUND__|" + old_str )    
+                            data = data.replace(old_str,new_str)
+                
+                if rpl_type == 'r' or rpl_type == 'b':
+                    if Mode == 'Recv':
+                        if old_str in data:
+                            logdata("__FOUND__|" + old_str )    
+                            data = data.replace(old_str,new_str)
 
-        prtcsinfo = '%s:%s <-- %s:%s' % csinfo
+        prtcsinfo = '%s:%s --> %s:%s' % csinfo if Mode == 'Send' else '%s:%s <-- %s:%s' % csinfo 
         prtcsinfo += ' len: %s' % len(data)
         prtcsinfo += ' id: %s' % (len(datahandle.allpk) - 1)
 
@@ -355,7 +383,13 @@ class MSock4(SOCKSv4):
 
                 repeat_package = datahandle.allpk[pckg_id].package
                 data = datahandle.allpk[pckg_id].data
-                SOCKSv4.dataReceived(repeat_package,datahandle.allpk[pckg_id].data)
+                mode = datahandle.allpk[pckg_id].mode
+                if mode == 'Recv':
+                    SOCKSv4.dataReceived(repeat_package,datahandle.allpk[pckg_id].data)
+                else:
+                    SOCKSv4.write(repeat_package, datahandle.allpk[pckg_id].data)
+
+
                 return str(getCSInfo(repeat_package)) + '\n' +  str(colored(hexdump(data), 'red'))
 
         elif command[0] == 'print':
@@ -452,10 +486,10 @@ class MSock4(SOCKSv4):
 
 
         elif command[0] == 'filter':
-            if len(command) != 2 and len(command) != 3 and len(command) != 4:
-                return '[E]Using: filter [addport|removeport|sendonly|recvonly|replace] + [port|str] + [/str]'
-            else:
-                return changeFilter(command)
+            # if len(command) != 2 and len(command) != 3 and len(command) != 4:
+            #     return '[E]Using: filter [addport|removeport|sendonly|recvonly|replace] + [port|str] + [/str]'
+            # else:
+            return changeFilter(command)
 
         else:
             return '[E]Unidentified command\n' + using()
@@ -503,7 +537,7 @@ Filter = {
     'Port':[],
     'Size':[],
     'ip':[],
-    'replace':{}
+    'replace':[]
 
 }
 
