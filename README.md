@@ -93,7 +93,10 @@ Example:
 
  * Only send or recv show up.
 
->filter replace [hexstring] [hexstring]
+
+>filter replace <s/r/b> [hex] <old_string> <new_string>
+ 
+ * filter mode [s]end, [r]recv, [b]oth hex(encode) 
 
  * Modify package before send
 
