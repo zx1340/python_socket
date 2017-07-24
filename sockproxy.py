@@ -15,7 +15,7 @@ import colorama
 import socket
 import os
 
-port, full_capture = 8080, False
+port = 8080
 printmode = 'hex'
 dumplen = 16
 colorama.init()
@@ -45,7 +45,9 @@ class Datahandle():
 
 
 def hexdump(src, sep='.'):
-    if printmode == 'text' or full_capture == False:
+    # if printmode == 'text' or full_capture == False:
+    #     return src
+    if src[0:4] == 'POST' or src[0:3] == 'GET':
         return src
 
     length = dumplen
@@ -102,28 +104,26 @@ def main(argv):
     os.system('rm -rf pkg.log')
     os.system('rm -rf zx.log')
 
-    global port, full_capture
+    global port
 
     try:
-        myopts, args = getopt.getopt(sys.argv[1:], 'p:f')
+        myopts, args = getopt.getopt(sys.argv[1:], 'p')
     except getopt.GetoptError as e:
         print (str(e))
         print 'Usage: %s [options]\nOptions:' \
               '\n-p port (listen port)' \
-              '\n-f full capture' \
               '\n' % (sys.argv[0])
         sys.exit(2)
 
     for o, a in myopts:
         if o == '-p':
             port = int(a)
-        elif o == '-f':
-            full_capture = True
+        
         
     factory = Factory
     factory.protocol = MSock4
     reactor.listenTCP(port, factory())
-    print 'Listen port: %s\nFull capture: %s' % (port, str(full_capture))
+    print 'Listen port: %s\n' % (port)
     reactor.run()
 
 
@@ -294,9 +294,7 @@ class MSock4(SOCKSv4):
     def handlePackage(self,Mode,data):
         #check filter and print out
         #ignore web traffic
-        if not full_capture:
-            if data[0:4] != 'POST' and data[0:3] != 'GET':
-                return data
+        #if not full_capture:
 
 
         global datahandle
@@ -333,13 +331,13 @@ class MSock4(SOCKSv4):
                         if old_str in data:
                             data = data.replace(old_str,new_str)
 
-        prtcsinfo = '%s:%s --> %s:%s' % csinfo if Mode == 'Send' else '%s:%s <-- %s:%s' % csinfo 
+        prtcsinfo = '%s:%s --> %s:%s' % csinfo if Mode == 'Recv' else '%s:%s <-- %s:%s' % csinfo 
         prtcsinfo += ' len: %s' % len(data)
         prtcsinfo += ' id: %s' % (len(datahandle.allpk) - 1)
 
 
         print colored(prtcsinfo, 'red')
-        print colored(hexdump(data), 'yellow') if Mode == 'Send' else colored(hexdump(data), 'green')
+        print colored(hexdump(data), 'green') if Mode == 'Recv' else colored(hexdump(data), 'yellow')
         logpackage(prtcsinfo)
         logpackage(data)
         return data
@@ -359,7 +357,7 @@ class MSock4(SOCKSv4):
 
         if command[0] == 'repeat':
             if len(command) != 2:
-                return '[E]Using: repeat <package_id>'
+                return '[E]Using: repeat <send_package_id>'
 
             else:
                 pckg_id = command[1]
@@ -372,43 +370,35 @@ class MSock4(SOCKSv4):
                 repeat_package = datahandle.allpk[pckg_id].package
                 data = datahandle.allpk[pckg_id].data
                 mode = datahandle.allpk[pckg_id].mode
-                if mode == 'Recv':
-                    SOCKSv4.dataReceived(repeat_package,datahandle.allpk[pckg_id].data)
+                if mode == 'Send':
+                    return "[E]Using: repeat <send_package_id>"
                 else:
                     SOCKSv4.write(repeat_package, datahandle.allpk[pckg_id].data)
 
 
-                return str(getCSInfo(repeat_package)) + '\n' +  str(colored(hexdump(data), 'red'))
+                return str(getCSInfo(repeat_package)) + '\n' +  str(colored(hexdump(data), 'red')) + self.get_lasted_package()
 
         elif command[0] == 'print':
-            if len(command) != 2:
-                return '[E]Using: print <package_id>' 
-            else:
-                
-                pckg_id = command[1]
-                try:
-                    if int(pckg_id) >= len(datahandle.allpk):
-                        return '[E]Invalid package id, current %s' %(len(datahandle.allpk) - 1) 
-                except:
-                    return '[E]Invalid package id'
+            if len(command) < 2:
+                return '[E]Using: print <package_id> [h]'
 
-                print_package = datahandle.allpk[pckg_id].package
-                data = datahandle.allpk[pckg_id].data
+            pckg_id = command[1]
+            try:
+                if int(pckg_id) >= len(datahandle.allpk):
+                    return '[E]Invalid package id, current %s' %(len(datahandle.allpk) - 1) 
+            except:
+                return '[E]Invalid package id'
+
+            print_package = datahandle.allpk[pckg_id].package
+            data = datahandle.allpk[pckg_id].data
+
+            if len(command) == 2:
                 return str(getCSInfo(print_package)) + '\n' +  str(colored(hexdump(data), 'red')) + '\n'
-        
-        elif command[0] == 'get':
-            if len(command) != 2:
-                return '[E]Using: print <package_id>' 
-            else:
-                pckg_id = command[1]
-                try:
-                    if int(pckg_id) >= len(datahandle.allpk):
-                        return '[E]Invalid package id, current %s' %(len(datahandle.allpk) - 1) 
-                except:
-                    return '[E]Invalid package id'
-                print_package = datahandle.allpk[pckg_id].package
-                data = datahandle.allpk[pckg_id].data
-                return str(getCSInfo(print_package)) + '\n' + data.encode('hex')
+            if len(command) == 3:
+                if command[2] == 'h':
+                    return str(getCSInfo(print_package)) + '\n' + data.encode('hex')
+
+            return '[E]Using: print <package_id> [h]'
 
 
         elif command[0] == 'diff':
@@ -470,7 +460,7 @@ class MSock4(SOCKSv4):
                 rpl_pckg = datahandle.allpk[pckg_id].package
 
                 SOCKSv4.dataReceived(rpl_pckg,data)
-                return '[I]Packet send without error'
+                return 'No error'
 
 
         elif command[0] == 'filter':
@@ -481,6 +471,12 @@ class MSock4(SOCKSv4):
 
         else:
             return '[E]Unidentified command\n' + using()
+
+    def get_lasted_package(self):
+        pckg_id = str(len(datahandle.allpk) - 1)
+        print_package = datahandle.allpk[pckg_id].package
+        data = datahandle.allpk[pckg_id].data
+        return str(getCSInfo(print_package)) + '\n' +  str(colored(hexdump(data), 'red')) + '\n'
 
 
     def dataReceived(self, data):
@@ -494,6 +490,8 @@ class MSock4(SOCKSv4):
         if cs[0] == '127.0.0.1' and cs[2] == '127.0.0.1':
             print '[<] Excute command:',data
             ret = self.runCommand(data)
+
+
             return SOCKSv4.write(self,ret)
 
 
